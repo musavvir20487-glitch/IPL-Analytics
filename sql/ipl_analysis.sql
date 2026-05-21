@@ -1,0 +1,161 @@
+-- USE ipl_analytics;
+
+-- DROP TABLE IF EXISTS deliveries;
+-- DROP TABLE IF EXISTS matches;
+
+-- CREATE TABLE matches (
+--     id               INT PRIMARY KEY,
+--     season           VARCHAR(10),
+--     city             VARCHAR(50),
+--     date             DATE,
+--     match_type       VARCHAR(20),
+--     player_of_match  VARCHAR(50),
+--     venue            VARCHAR(100),
+--     team1            VARCHAR(60),
+--     team2            VARCHAR(60),
+--     toss_winner      VARCHAR(60),
+--     toss_decision    VARCHAR(10),
+--     winner           VARCHAR(60),
+--     result           VARCHAR(20),
+--     result_margin    VARCHAR(20),
+--     target_runs      VARCHAR(10),
+--     target_overs     VARCHAR(10),
+--     super_over       VARCHAR(5),
+--     method           VARCHAR(20),
+--     umpire1          VARCHAR(50),
+--     umpire2          VARCHAR(50)
+-- );
+
+-- CREATE TABLE deliveries (
+--     match_id          INT,
+--     inning            INT,
+--     batting_team      VARCHAR(60),
+--     bowling_team      VARCHAR(60),
+--     over_num          INT,
+--     ball              INT,
+--     batter            VARCHAR(50),
+--     bowler            VARCHAR(50),
+--     non_striker       VARCHAR(50),
+--     batsman_runs      INT,
+--     extra_runs        INT,
+--     total_runs        INT,
+--     extras_type       VARCHAR(20),
+--     is_wicket         INT,
+--     player_dismissed  VARCHAR(50),
+--     dismissal_kind    VARCHAR(30),
+--     fielder           VARCHAR(50)
+-- );
+-- LOAD DATA INFILE 'C:/ProgramData/MySQL/MySQL Server 8.0/Uploads/matches.csv'
+-- INTO TABLE matches
+-- CHARACTER SET utf8mb4
+-- FIELDS TERMINATED BY ','
+-- ENCLOSED BY '"'
+-- LINES TERMINATED BY '\r\n'
+-- IGNORE 1 ROWS;
+-- LOAD DATA INFILE 'C:/ProgramData/MySQL/MySQL Server 8.0/Uploads/deliveries.csv'
+-- INTO TABLE deliveries
+-- CHARACTER SET utf8mb4
+-- FIELDS TERMINATED BY ','
+-- ENCLOSED BY '"'
+-- LINES TERMINATED BY '\r\n'
+-- IGNORE 1 ROWS;
+
+---
+-- SELECT COUNT(*) FROM matches;
+-- SELECT COUNT(*) FROM deliveries;
+select * from matches limit 27;
+select * from deliveries limit 30;
+---
+-- --  Q001 :- Top 10 batsmen by total runs (all seasons) Skills: SUM, GROUP BY, ORDER BY, LIMIT
+-- select batter as Top_10_Batsman, sum(batsman_runs) as batsmanruns
+-- from deliveries 
+-- group by batter 
+-- order by batsmanruns desc
+-- limit 10;
+-- -- Q002 :- . Top 10 bowlers by total wickets Skills: COUNT with WHERE filter (is_wicket = 1), GROUP BY
+-- select bowler as Top_10_Bowlers, count(*) as total_wickets
+-- from deliveries
+-- where is_wicket = 1 and dismissal_kind != 'run out'
+-- group by bowler 
+-- order by total_wickets desc
+-- limit 10;
+-- -- Q003 :- Team win count per season Skills: GROUP BY on two columns, COUNT
+--  select season, winner, count(*) as Win_Count
+--  from matches 
+--  where winner IS NOT NULL
+--  group by season, winner 
+--  order by season asc, Win_Count desc;
+-- -- Q004 :-  Toss decision analysis — does winning toss help win the match? Skills: Conditional counting, GROUP BY, percentage calculation
+-- SELECT
+--     toss_decision,
+--     COUNT(*) AS total_matches,
+--     SUM(CASE WHEN toss_winner = winner THEN 1 ELSE 0 END) AS toss_winner_won,
+--     ROUND(SUM(CASE WHEN toss_winner = winner THEN 1 ELSE 0 END) * 100.0 / COUNT(*), 2) AS win_pct
+-- FROM matches
+-- WHERE winner IS NOT NULL
+-- GROUP BY toss_decision;
+-- -- Q005 :-  Player of the Match leaderboard (join matches table) Skills: JOIN matches + deliveries, GROUP BY, COUNT
+-- select player_of_match, count(*) as award_count
+-- from matches 
+-- group by player_of_match
+-- order by award_count desc;
+-- -- Q006 :-  Highest individual score in a single innings Skills: SUM grouped by match_id + batter + inning, then MAX or ORDER BY + LIMIT
+-- select batter as batsman, match_id, inning, sum(batsman_runs) as inning_score 
+-- from deliveries 
+-- group by batter, match_id, inning
+-- order by inning_score desc;
+-- -- Q007 :- Best economy rate for bowlers (min 10 overs bowled) Skills: SUM of total_runs, COUNT of balls, HAVING clause, calculated column
+-- select bowler, count(*) as balls_bowled, sum(total_runs) as runs_given,
+-- round(sum(total_runs)*6/count(*),2) as economy 
+-- from deliveries 
+-- group by bowler
+-- having count(*) >= 60
+-- order by economy desc;
+-- -- Q008 :- Season-wise average first innings score Skills: JOIN matches + deliveries, filter inning=1, GROUP BY season
+-- with innings_totals as (
+-- select m.season as season,d.match_id, sum(d.total_runs) as innings_total
+-- from matches m join deliveries d 
+-- on m.id = d.match_id
+-- where d.inning = 1
+-- group by m.season,d.match_id)
+-- select season, round(avg(innings_total),2) as avg_first_innings_score
+-- from innings_totals 
+-- group by season 
+-- order by season asc ;
+-- -- Q009 :-  Ranking batsmen within each season by runs (DENSE_RANK) Skills: CTE + DENSE_RANK() OVER (PARTITION BY season)
+-- with total_run as (
+-- select m.season as season, d.batter as batter, sum(d.batsman_runs) as total_runs
+-- from matches m join deliveries d 
+-- on m.id = d.match_id 
+-- group by m.season, d.batter 
+-- )
+-- select season, batter, total_runs, 
+-- dense_rank() over (partition by season order by total_runs desc) as season_rank
+-- from total_run 
+-- order by season, season_rank;
+-- -- Q010 :- Running total of runs per over in a specific match Skills: SUM() OVER (PARTITION BY match_id, inning ORDER BY over_num)
+-- with over_runs as (
+-- select match_id, inning, over_num, sum(total_runs) as runs_in_over
+-- from deliveries
+-- where match_id = 335982
+-- group by match_id, inning, over_num)
+-- select match_id, inning, over_num, runs_in_over, 
+-- sum(runs_in_over) over (partition by inning order by over_num) as running_total
+-- from over_runs;
+-- -- Q011 :- Bowlers with best strike rate (min 50 wickets overall) Skills: Subquery or CTE, balls per wicket calculation, HAVING
+-- select bowler, count(*) as balls_bowled,
+-- count(case when is_wicket = 1 then 1 end) as total_wickets,
+-- round(count(*)/count(case when is_wicket = 1 and dismissal_kind != 'run out' then 1 end),2) as strike_rate 
+-- from deliveries
+-- group by bowler
+-- having total_wickets >= 50 
+-- order by strike_rate asc;
+-- -- Q012 :-  Head-to-head team record — wins between any two teams Skills: Self-style aggregation, CASE WHEN, GROUP BY team pair
+-- select team1, team2, count(*) as matches_played,
+-- sum(case when winner = team1 then 1 else 0 end) as team1_wins,
+-- sum(case when winner = team2 then 1 else 0 end) as team2_wins
+-- from matches
+-- where (team1 = 'Mumbai Indians' and team2 = 'Rojasthan Royals') or
+-- (team1 = 'Rajasthan Royals' and team2 = 'Mumbai Indians')
+-- group by team1, team2
+-- -- ========= THE END ========= -- -- 
