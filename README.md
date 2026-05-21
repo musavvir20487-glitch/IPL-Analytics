@@ -29,5 +29,4 @@ top players, toss impact, and season trends.
 2. Install requirements: `pip install pandas matplotlib seaborn mysql-connector-python`
 3. Run `ipl_analysis.ipynb` in Jupyter
 
-## 📬 Contact
-www.linkedin.com/in/YOURPROFILE
+www.linkedin.com/in/syed-musavvir-rehan-444b30379
